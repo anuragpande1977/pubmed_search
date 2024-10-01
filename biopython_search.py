@@ -3,6 +3,7 @@ import pandas as pd
 import streamlit as st
 from Bio import Entrez, Medline
 from io import BytesIO
+import matplotlib.pyplot as plt
 
 # Define PubMed article types and their corresponding search tags
 article_types = {
@@ -64,6 +65,33 @@ def save_to_excel(articles):
     output.seek(0)  # Move the buffer position to the beginning
     return output
 
+# Function to count articles by publication year
+def count_articles_by_year(articles):
+    year_count = {}
+    
+    for article in articles:
+        pub_date = article.get('DP', 'No publication date available')
+        if pub_date != 'No publication date available':
+            year = pub_date.split()[0]  # Extracting the year
+            if year.isdigit():  # Ensure it's a valid year
+                year_count[year] = year_count.get(year, 0) + 1
+    
+    return year_count
+
+# Function to display the bar chart
+def plot_publication_years(year_count):
+    if year_count:
+        years = list(year_count.keys())
+        counts = list(year_count.values())
+
+        plt.figure(figsize=(10, 5))
+        plt.bar(years, counts, color='blue')
+        plt.xlabel('Publication Year')
+        plt.ylabel('Number of Articles')
+        plt.title('Number of Articles Published per Year')
+        plt.xticks(rotation=45)
+        st.pyplot(plt)
+
 # Streamlit UI for user inputs
 st.title("PubMed Article Fetcher")
 st.write("Search PubMed for articles and save the results as an Excel file.")
@@ -86,6 +114,14 @@ if st.button("Fetch Articles"):
                 file_name="pubmed_articles.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
+            
+            # Count articles by year and plot the results
+            year_count = count_articles_by_year(articles)
+            if year_count:
+                st.write("Publication Year Distribution:")
+                plot_publication_years(year_count)
+            else:
+                st.write("No valid publication dates found to plot the graph.")
         else:
             st.write("No articles fetched.")
     else:
