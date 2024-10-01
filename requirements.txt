@@ -7,7 +7,7 @@ openpyxl>=3.0.7
 scispacy>=0.5.0
 spacy>=3.0
 transformers>=4.11.0
-torch>=1.9.0
-scipy>=1.9.0  # Ensure you're installing a version with pre-built binaries
-numpy>=1.21.0  # Install a pre-built binary
+torch>=1.9.0  # For using BioBERT with transformers
+scipy>=1.9.0  # Prebuilt binary for mathematical functions
+numpy>=1.21.0  # Prebuilt binary for numerical functions
 
