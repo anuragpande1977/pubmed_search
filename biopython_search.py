@@ -14,10 +14,15 @@ article_types = {
     "Systematic Reviews": "Systematic Review[pt]",
 }
 
-# Function to construct query
-def construct_query(search_term, choice):
+# Function to construct query with optional MeSH term
+def construct_query(search_term, mesh_term, choice):
     chosen_article_type = article_types[choice]
     query = f"({search_term}) AND {chosen_article_type}"
+    
+    # Include MeSH term if provided
+    if mesh_term:
+        query += f" AND {mesh_term}[MeSH Terms]"
+    
     return query
 
 # Function to fetch articles from PubMed
@@ -106,12 +111,13 @@ st.write("Search PubMed for articles and save the results as an Excel file.")
 
 email = st.text_input("Enter your email (for PubMed access):")
 search_term = st.text_input("Enter the general search term:")
+mesh_term = st.text_input("Enter an optional MeSH term (leave blank if not needed):")
 article_choice = st.selectbox("Select article type:", list(article_types.keys()))
 num_articles = st.number_input("Enter the number of articles to fetch:", min_value=1, max_value=1000, value=10)
 
 if st.button("Fetch Articles"):
     if email and search_term:
-        query = construct_query(search_term, article_choice)
+        query = construct_query(search_term, mesh_term, article_choice)
         articles = fetch_abstracts(query, num_articles, email)
         
         if articles:
