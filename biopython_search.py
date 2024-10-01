@@ -3,9 +3,8 @@ import pandas as pd
 import streamlit as st
 from Bio import Entrez, Medline
 from io import BytesIO
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-import numpy as np  # Needed to create 3D spheres
+import plotly.graph_objs as go
+import numpy as np
 
 # Define PubMed article types and their corresponding search tags
 article_types = {
@@ -80,39 +79,69 @@ def count_articles_by_year(articles):
     
     return year_count
 
-# Function to plot 3D spheres at each point
-def plot_publication_years_3d_spheres(year_count):
+# Function to plot animated bubbles with gravity effect using Plotly
+def plot_animated_bubbles_with_gravity(year_count):
     if year_count:
         years = list(year_count.keys())
         counts = list(year_count.values())
+        
+        # Create a timeline of steps (frames) for animation
+        time_steps = 50
+        frames = []
+        for step in range(time_steps):
+            z_values = [count - (step * 0.1) for count in counts]  # Simulate gravity by reducing z
+            bubble_sizes = [count * 10 for count in counts]
+            
+            frame_data = go.Scatter3d(
+                x=years, 
+                y=[0] * len(years), 
+                z=z_values, 
+                mode='markers',
+                marker=dict(
+                    size=bubble_sizes,
+                    color=bubble_sizes,
+                    opacity=0.8,
+                    colorscale='Viridis',
+                )
+            )
+            frames.append(go.Frame(data=[frame_data]))
 
-        fig = plt.figure(figsize=(10, 7))
-        ax = fig.add_subplot(111, projection='3d')
+        # Initial plot
+        initial_plot = go.Scatter3d(
+            x=years,
+            y=[0] * len(years),
+            z=counts,
+            mode='markers',
+            marker=dict(
+                size=[count * 10 for count in counts],
+                color=[count * 10 for count in counts],
+                opacity=0.8,
+                colorscale='Viridis',
+            )
+        )
 
-        # Create 3D spheres at each data point
-        for i, year in enumerate(years):
-            count = counts[i]
-            # Scale sphere size based on count
-            radius = count / max(counts)  # Normalize to keep the sizes relative
+        # Define layout
+        layout = go.Layout(
+            title='Animated Bubble Chart with Gravity Effect',
+            scene=dict(
+                xaxis=dict(title='Publication Year'),
+                yaxis=dict(title='Y-axis'),
+                zaxis=dict(title='Number of Articles'),
+            ),
+            updatemenus=[dict(
+                type="buttons",
+                buttons=[dict(label="Play",
+                              method="animate",
+                              args=[None, dict(frame=dict(duration=100, redraw=True), fromcurrent=True)])
+                         ]
+            )]
+        )
 
-            # Generate the sphere data
-            u, v = np.mgrid[0:2*np.pi:20j, 0:np.pi:10j]
-            x = radius * np.cos(u) * np.sin(v)
-            y = radius * np.sin(u) * np.sin(v)
-            z = radius * np.cos(v)
-
-            # Adjust the position of the sphere
-            ax.plot_surface(x + i, y + count, z + count, color=plt.cm.cool(i / len(years)), alpha=0.6)
-
-            # Add text for the count
-            ax.text(i, count, count, f'{count}', color='black', ha='center')
-
-        ax.set_xlabel('Year Index')
-        ax.set_ylabel('Number of Articles')
-        ax.set_zlabel('Number of Articles (Depth)')
-        ax.set_title('3D Sphere Bubble Chart of Articles Published by Year')
-
-        st.pyplot(fig)
+        # Combine into a figure
+        fig = go.Figure(data=[initial_plot], layout=layout, frames=frames)
+        
+        # Render Plotly chart in Streamlit
+        st.plotly_chart(fig, use_container_width=True)
 
 # Streamlit UI for user inputs
 st.title("PubMed Research Navigator")
@@ -137,11 +166,11 @@ if st.button("Fetch Articles"):
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
             
-            # Count articles by year and plot the results with 3D spheres
+            # Count articles by year and plot the animated bubbles
             year_count = count_articles_by_year(articles)
             if year_count:
-                st.write("Publication Year Distribution (3D Sphere Chart):")
-                plot_publication_years_3d_spheres(year_count)
+                st.write("Publication Year Distribution (Animated Bubble Chart):")
+                plot_animated_bubbles_with_gravity(year_count)
             else:
                 st.write("No valid publication dates found to plot the graph.")
         else:
