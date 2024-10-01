@@ -4,6 +4,7 @@ import streamlit as st
 from Bio import Entrez, Medline
 from io import BytesIO
 import matplotlib.pyplot as plt
+import numpy as np  # For adding randomness
 
 # Define PubMed article types and their corresponding search tags
 article_types = {
@@ -78,19 +79,24 @@ def count_articles_by_year(articles):
     
     return year_count
 
-# Function to display the bubble chart
+# Function to display the floating bubble chart
 def plot_publication_years_bubble(year_count):
     if year_count:
         years = list(year_count.keys())
         counts = list(year_count.values())
         sizes = [count * 100 for count in counts]  # Bubble sizes (scale factor for better visualization)
 
-        plt.figure(figsize=(10, 5))
-        plt.scatter(years, counts, s=sizes, alpha=0.5, c=counts, cmap="cool", edgecolors="w", linewidth=2)
+        # Adding randomness to simulate height variation (floating in the air)
+        heights = np.random.uniform(low=0.5, high=5.0, size=len(years))
+
+        plt.figure(figsize=(10, 7))
+        plt.scatter(years, heights, s=sizes, alpha=0.6, c=counts, cmap="cool", edgecolors="w", linewidth=2)
+
         plt.xlabel('Publication Year')
-        plt.ylabel('Number of Articles')
-        plt.title('Number of Articles Published per Year (Bubble Size Represents Quantity)')
+        plt.ylabel('Floating Height (Randomized)')
+        plt.title('Number of Articles Published per Year (Floating Bubble Chart)')
         plt.xticks(rotation=45)
+        plt.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.7)
         st.pyplot(plt)
 
 # Streamlit UI for user inputs
@@ -116,10 +122,10 @@ if st.button("Fetch Articles"):
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
             
-            # Count articles by year and plot the results with a bubble chart
+            # Count articles by year and plot the results with a floating bubble chart
             year_count = count_articles_by_year(articles)
             if year_count:
-                st.write("Publication Year Distribution (Bubble Chart):")
+                st.write("Publication Year Distribution (Floating Bubble Chart):")
                 plot_publication_years_bubble(year_count)
             else:
                 st.write("No valid publication dates found to plot the graph.")
