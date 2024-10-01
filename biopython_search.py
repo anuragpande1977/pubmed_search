@@ -93,7 +93,7 @@ def plot_publication_years(year_count):
         st.pyplot(plt)
 
 # Streamlit UI for user inputs
-st.title("PubMed Article Fetcher")
+st.title("PubMed Research Navigator")
 st.write("Search PubMed for articles and save the results as an Excel file.")
 
 email = st.text_input("Enter your email (for PubMed access):")
@@ -126,7 +126,7 @@ if st.button("Fetch Articles"):
             st.write("No articles fetched.")
     else:
         st.write("Please fill in all the required fields.")
-
+st.write(Copyright (c) 2024 Anurag Pande)
 # Copyright information
 
 # Copyright information
