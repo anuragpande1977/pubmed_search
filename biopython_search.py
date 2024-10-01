@@ -3,8 +3,7 @@ import pandas as pd
 import streamlit as st
 from Bio import Entrez, Medline
 from io import BytesIO
-import plotly.graph_objs as go
-import numpy as np
+import matplotlib.pyplot as plt
 
 # Define PubMed article types and their corresponding search tags
 article_types = {
@@ -79,69 +78,21 @@ def count_articles_by_year(articles):
     
     return year_count
 
-# Function to plot animated bubbles with gravity effect using Plotly
-def plot_animated_bubbles_with_gravity(year_count):
+# Function to display the pie chart with bright colors
+def plot_publication_years_pie_chart(year_count):
     if year_count:
         years = list(year_count.keys())
         counts = list(year_count.values())
+
+        plt.figure(figsize=(8, 8))
         
-        # Create a timeline of steps (frames) for animation
-        time_steps = 50
-        frames = []
-        for step in range(time_steps):
-            z_values = [count - (step * 0.1) for count in counts]  # Simulate gravity by reducing z
-            bubble_sizes = [count * 10 for count in counts]
-            
-            frame_data = go.Scatter3d(
-                x=years, 
-                y=[0] * len(years), 
-                z=z_values, 
-                mode='markers',
-                marker=dict(
-                    size=bubble_sizes,
-                    color=bubble_sizes,
-                    opacity=0.8,
-                    colorscale='Viridis',
-                )
-            )
-            frames.append(go.Frame(data=[frame_data]))
+        # Using a bright color map for the pie chart
+        bright_colors = plt.cm.get_cmap('Set3', len(years))
 
-        # Initial plot
-        initial_plot = go.Scatter3d(
-            x=years,
-            y=[0] * len(years),
-            z=counts,
-            mode='markers',
-            marker=dict(
-                size=[count * 10 for count in counts],
-                color=[count * 10 for count in counts],
-                opacity=0.8,
-                colorscale='Viridis',
-            )
-        )
-
-        # Define layout
-        layout = go.Layout(
-            title='Animated Bubble Chart with Gravity Effect',
-            scene=dict(
-                xaxis=dict(title='Publication Year'),
-                yaxis=dict(title='Y-axis'),
-                zaxis=dict(title='Number of Articles'),
-            ),
-            updatemenus=[dict(
-                type="buttons",
-                buttons=[dict(label="Play",
-                              method="animate",
-                              args=[None, dict(frame=dict(duration=100, redraw=True), fromcurrent=True)])
-                         ]
-            )]
-        )
-
-        # Combine into a figure
-        fig = go.Figure(data=[initial_plot], layout=layout, frames=frames)
-        
-        # Render Plotly chart in Streamlit
-        st.plotly_chart(fig, use_container_width=True)
+        plt.pie(counts, labels=years, autopct='%1.1f%%', colors=bright_colors(range(len(years))), startangle=140, wedgeprops={'edgecolor': 'black'})
+        plt.title('Distribution of Articles by Publication Year', fontsize=16)
+        plt.axis('equal')  # Equal aspect ratio ensures the pie is drawn as a circle.
+        st.pyplot(plt)
 
 # Streamlit UI for user inputs
 st.title("PubMed Research Navigator")
@@ -166,11 +117,11 @@ if st.button("Fetch Articles"):
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
             
-            # Count articles by year and plot the animated bubbles
+            # Count articles by year and plot the pie chart with bright colors
             year_count = count_articles_by_year(articles)
             if year_count:
-                st.write("Publication Year Distribution (Animated Bubble Chart):")
-                plot_animated_bubbles_with_gravity(year_count)
+                st.write("Publication Year Distribution (Pie Chart):")
+                plot_publication_years_pie_chart(year_count)
             else:
                 st.write("No valid publication dates found to plot the graph.")
         else:
