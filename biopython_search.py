@@ -2,6 +2,7 @@ import os
 import pandas as pd
 import streamlit as st
 from Bio import Entrez, Medline
+from io import BytesIO
 
 # Define PubMed article types and their corresponding search tags
 article_types = {
@@ -12,22 +13,13 @@ article_types = {
     "Systematic Reviews": "Systematic Review[pt]",
 }
 
-# Streamlit UI for user inputs
-st.title("PubMed Article Fetcher")
-st.write("Search PubMed for articles and save the results as an Excel file.")
-
-email = st.text_input("Enter your email (for PubMed access):")
-search_term = st.text_input("Enter the general search term:")
-article_choice = st.selectbox("Select article type:", list(article_types.keys()))
-num_articles = st.number_input("Enter the number of articles to fetch:", min_value=1, max_value=1000, value=10)
-directory = st.text_input("Enter the directory to save the file (default is current directory):", ".")
-filename = st.text_input("Enter the filename for the Excel file (with .xlsx extension):", "results.xlsx")
-
+# Function to construct query
 def construct_query(search_term, choice):
     chosen_article_type = article_types[choice]
     query = f"({search_term}) AND {chosen_article_type}"
     return query
 
+# Function to fetch articles from PubMed
 def fetch_abstracts(query, num_articles, email):
     Entrez.email = email
     st.write(f"Searching PubMed with query: {query}")
@@ -52,11 +44,10 @@ def fetch_abstracts(query, num_articles, email):
         st.write(f"An error occurred: {e}")
         return []
 
-def save_to_excel(articles, directory, filename):
-    if not articles:
-        st.write("No articles to save.")
-        return
-    full_path = os.path.join(directory, filename)
+# Function to generate Excel file in memory
+def save_to_excel(articles):
+    output = BytesIO()
+    
     data = [{
         'Title': article.get('TI', 'No title available'),
         'Authors': ', '.join(article.get('AU', 'No authors available')),
@@ -66,19 +57,39 @@ def save_to_excel(articles, directory, filename):
     } for article in articles]
     
     df = pd.DataFrame(data)
-    if not os.path.exists(directory):
-        os.makedirs(directory)
-    df.to_excel(full_path, index=False, engine='openpyxl')
-    st.write(f"Data saved to {full_path}")
+    
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False)
+    
+    output.seek(0)  # Move the buffer position to the beginning
+    return output
 
-# When the user clicks the 'Fetch Articles' button
+# Streamlit UI for user inputs
+st.title("PubMed Article Fetcher")
+st.write("Search PubMed for articles and save the results as an Excel file.")
+
+email = st.text_input("Enter your email (for PubMed access):")
+search_term = st.text_input("Enter the general search term:")
+article_choice = st.selectbox("Select article type:", list(article_types.keys()))
+num_articles = st.number_input("Enter the number of articles to fetch:", min_value=1, max_value=1000, value=10)
+
 if st.button("Fetch Articles"):
-    if email and search_term and filename:
+    if email and search_term:
         query = construct_query(search_term, article_choice)
-        articles = fetch_abstracts(query, int(num_articles), email)
+        articles = fetch_abstracts(query, num_articles, email)
+        
         if articles:
-            save_to_excel(articles, directory, filename)
+            excel_data = save_to_excel(articles)
+            st.download_button(
+                label="Download Excel file",
+                data=excel_data,
+                file_name="pubmed_articles.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
         else:
             st.write("No articles fetched.")
     else:
         st.write("Please fill in all the required fields.")
+
+# Copyright information
+st.text("Software copyright holder: Anurag Pande")
