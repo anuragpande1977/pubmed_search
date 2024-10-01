@@ -4,7 +4,8 @@ import streamlit as st
 from Bio import Entrez, Medline
 from io import BytesIO
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D  # For 3D plotting
+from mpl_toolkits.mplot3d import Axes3D
+import numpy as np  # Needed to create 3D spheres
 
 # Define PubMed article types and their corresponding search tags
 article_types = {
@@ -79,33 +80,38 @@ def count_articles_by_year(articles):
     
     return year_count
 
-# Function to display the 3D bubble chart
-def plot_publication_years_bubble_3d(year_count):
+# Function to plot 3D spheres at each point
+def plot_publication_years_3d_spheres(year_count):
     if year_count:
         years = list(year_count.keys())
         counts = list(year_count.values())
-        sizes = [count * 100 for count in counts]  # Bubble sizes (scale factor for better visualization)
 
         fig = plt.figure(figsize=(10, 7))
         ax = fig.add_subplot(111, projection='3d')
 
-        z = counts  # Z-axis will be the same as the number of articles
-        x = list(range(len(years)))  # X-axis is the index of the years
-        y = counts  # Y-axis will represent the counts as well (for bubble height)
+        # Create 3D spheres at each data point
+        for i, year in enumerate(years):
+            count = counts[i]
+            # Scale sphere size based on count
+            radius = count / max(counts)  # Normalize to keep the sizes relative
 
-        # Plot 3D scatter with bubble sizes
-        scatter = ax.scatter(x, y, z, s=sizes, alpha=0.6, c=z, cmap="cool", edgecolors="w", linewidth=2)
+            # Generate the sphere data
+            u, v = np.mgrid[0:2*np.pi:20j, 0:np.pi:10j]
+            x = radius * np.cos(u) * np.sin(v)
+            y = radius * np.sin(u) * np.sin(v)
+            z = radius * np.cos(v)
 
-        # Add the count as text on each bubble
-        for i in range(len(years)):
-            ax.text(x[i], y[i], z[i], f"{counts[i]}", fontsize=10, ha='center', va='center')
+            # Adjust the position of the sphere
+            ax.plot_surface(x + i, y + count, z + count, color=plt.cm.cool(i / len(years)), alpha=0.6)
 
-        ax.set_xlabel('Year (Index)')
+            # Add text for the count
+            ax.text(i, count, count, f'{count}', color='black', ha='center')
+
+        ax.set_xlabel('Year Index')
         ax.set_ylabel('Number of Articles')
         ax.set_zlabel('Number of Articles (Depth)')
-        ax.set_title('3D Bubble Chart: Articles Published by Year')
+        ax.set_title('3D Sphere Bubble Chart of Articles Published by Year')
 
-        plt.xticks(x, years, rotation=45)
         st.pyplot(fig)
 
 # Streamlit UI for user inputs
@@ -131,11 +137,11 @@ if st.button("Fetch Articles"):
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
             
-            # Count articles by year and plot the results with a 3D bubble chart
+            # Count articles by year and plot the results with 3D spheres
             year_count = count_articles_by_year(articles)
             if year_count:
-                st.write("Publication Year Distribution (3D Bubble Chart):")
-                plot_publication_years_bubble_3d(year_count)
+                st.write("Publication Year Distribution (3D Sphere Chart):")
+                plot_publication_years_3d_spheres(year_count)
             else:
                 st.write("No valid publication dates found to plot the graph.")
         else:
