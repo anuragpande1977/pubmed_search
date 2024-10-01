@@ -4,7 +4,7 @@ import streamlit as st
 from Bio import Entrez, Medline
 from io import BytesIO
 import matplotlib.pyplot as plt
-import numpy as np  # For adding randomness
+from mpl_toolkits.mplot3d import Axes3D  # For 3D plotting
 
 # Define PubMed article types and their corresponding search tags
 article_types = {
@@ -79,25 +79,34 @@ def count_articles_by_year(articles):
     
     return year_count
 
-# Function to display the floating bubble chart
-def plot_publication_years_bubble(year_count):
+# Function to display the 3D bubble chart
+def plot_publication_years_bubble_3d(year_count):
     if year_count:
         years = list(year_count.keys())
         counts = list(year_count.values())
         sizes = [count * 100 for count in counts]  # Bubble sizes (scale factor for better visualization)
 
-        # Adding randomness to simulate height variation (floating in the air)
-        heights = np.random.uniform(low=0.5, high=5.0, size=len(years))
+        fig = plt.figure(figsize=(10, 7))
+        ax = fig.add_subplot(111, projection='3d')
 
-        plt.figure(figsize=(10, 7))
-        plt.scatter(years, heights, s=sizes, alpha=0.6, c=counts, cmap="cool", edgecolors="w", linewidth=2)
+        z = counts  # Z-axis will be the same as the number of articles
+        x = list(range(len(years)))  # X-axis is the index of the years
+        y = counts  # Y-axis will represent the counts as well (for bubble height)
 
-        plt.xlabel('Publication Year')
-        plt.ylabel('Floating Height (Randomized)')
-        plt.title('Number of Articles Published per Year (Floating Bubble Chart)')
-        plt.xticks(rotation=45)
-        plt.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.7)
-        st.pyplot(plt)
+        # Plot 3D scatter with bubble sizes
+        scatter = ax.scatter(x, y, z, s=sizes, alpha=0.6, c=z, cmap="cool", edgecolors="w", linewidth=2)
+
+        # Add the count as text on each bubble
+        for i in range(len(years)):
+            ax.text(x[i], y[i], z[i], f"{counts[i]}", fontsize=10, ha='center', va='center')
+
+        ax.set_xlabel('Year (Index)')
+        ax.set_ylabel('Number of Articles')
+        ax.set_zlabel('Number of Articles (Depth)')
+        ax.set_title('3D Bubble Chart: Articles Published by Year')
+
+        plt.xticks(x, years, rotation=45)
+        st.pyplot(fig)
 
 # Streamlit UI for user inputs
 st.title("PubMed Research Navigator")
@@ -122,11 +131,11 @@ if st.button("Fetch Articles"):
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
             
-            # Count articles by year and plot the results with a floating bubble chart
+            # Count articles by year and plot the results with a 3D bubble chart
             year_count = count_articles_by_year(articles)
             if year_count:
-                st.write("Publication Year Distribution (Floating Bubble Chart):")
-                plot_publication_years_bubble(year_count)
+                st.write("Publication Year Distribution (3D Bubble Chart):")
+                plot_publication_years_bubble_3d(year_count)
             else:
                 st.write("No valid publication dates found to plot the graph.")
         else:
