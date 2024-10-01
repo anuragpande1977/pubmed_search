@@ -126,7 +126,7 @@ if st.button("Fetch Articles"):
             st.write("No articles fetched.")
     else:
         st.write("Please fill in all the required fields.")
-st.write(Copyright (c) 2024 Anurag Pande)
+st.write("Copyright (c) 2024 Anurag Pande")
 # Copyright information
 
 # Copyright information
