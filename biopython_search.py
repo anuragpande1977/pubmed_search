@@ -1,32 +1,37 @@
-import os
+import scispacy
+import spacy
 import pandas as pd
 import streamlit as st
 from Bio import Entrez, Medline
 from io import BytesIO
-import matplotlib.pyplot as plt
+from scispacy.linking import EntityLinker
 
-# Define PubMed article types and their corresponding search tags
-article_types = {
-    "Clinical Trials": "Clinical Trial[pt]",
-    "Meta-Analysis": "Meta-Analysis[pt]",
-    "Randomized Controlled Trials": "Randomized Controlled Trial[pt]",
-    "Reviews": "Review[pt]",
-    "Systematic Reviews": "Systematic Review[pt]",
-}
+# Load the SciSpacy model and UMLS linker (optional)
+nlp = spacy.load("en_core_sci_sm")  # You can use en_core_sci_lg for a larger, more accurate model
+linker = EntityLinker(resolve_abbreviations=True, name="umls")
 
-# Function to construct query with optional MeSH term
-def construct_query(search_term, mesh_term, choice):
-    chosen_article_type = article_types[choice]
-    query = f"({search_term}) AND {chosen_article_type}"
+# Function to extract entities from abstracts using SciSpacy
+def extract_entities_scispacy(text):
+    doc = nlp(text)
+    chemicals = []
+    mesh_terms = []
     
-    # Include MeSH term if provided
-    if mesh_term:
-        query += f" AND {mesh_term}[MeSH Terms]"
+    for ent in doc.ents:
+        # Filter relevant entities like chemicals, diseases, genes, etc.
+        if ent.label_ in ["CHEMICAL", "DISEASE", "ENTITY", "GENE_OR_GENOME"]:  # You can refine this based on your needs
+            chemicals.append(ent.text)
+        
+        # Linking entities to UMLS or other ontologies for MeSH terms
+        if linker is not None:
+            for umls_ent in ent._.umls_ents:
+                linked_entity = linker.kb.cui_to_entity[umls_ent[0]]
+                if "MeSH" in linked_entity.definition:  # Example of identifying MeSH terms
+                    mesh_terms.append(linked_entity.canonical_name)
     
-    return query
+    return mesh_terms, chemicals
 
-# Function to fetch articles from PubMed
-def fetch_abstracts(query, num_articles, email):
+# Function to fetch articles and extract entities
+def fetch_and_process_articles(query, num_articles, email):
     Entrez.email = email
     st.write(f"Searching PubMed with query: {query}")
     
@@ -45,24 +50,31 @@ def fetch_abstracts(query, num_articles, email):
         articles = list(records)
         handle.close()
 
-        return articles
+        # Extract entities from abstracts
+        processed_data = []
+        for article in articles:
+            title = article.get('TI', 'No title available')
+            abstract = article.get('AB', 'No abstract available')
+            
+            # Process text with SciSpacy
+            mesh_terms, chemicals = extract_entities_scispacy(abstract)
+            
+            processed_data.append({
+                'Title': title,
+                'Abstract': abstract,
+                'MeSH Terms': mesh_terms,
+                'Chemicals': chemicals
+            })
+        
+        return pd.DataFrame(processed_data)
+    
     except Exception as e:
         st.write(f"An error occurred: {e}")
         return []
 
 # Function to generate Excel file in memory
-def save_to_excel(articles):
+def save_to_excel(df):
     output = BytesIO()
-    
-    data = [{
-        'Title': article.get('TI', 'No title available'),
-        'Authors': ', '.join(article.get('AU', 'No authors available')),
-        'Abstract': article.get('AB', 'No abstract available'),
-        'Publication Date': article.get('DP', 'No publication date available'),
-        'Journal': article.get('TA', 'No journal available')
-    } for article in articles]
-    
-    df = pd.DataFrame(data)
     
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df.to_excel(writer, index=False)
@@ -70,77 +82,35 @@ def save_to_excel(articles):
     output.seek(0)  # Move the buffer position to the beginning
     return output
 
-# Function to count articles by publication year
-def count_articles_by_year(articles):
-    year_count = {}
-    
-    for article in articles:
-        pub_date = article.get('DP', 'No publication date available')
-        if pub_date != 'No publication date available':
-            year = pub_date.split()[0]  # Extracting the year
-            if year.isdigit():  # Ensure it's a valid year
-                year_count[year] = year_count.get(year, 0) + 1
-    
-    return year_count
-
-# Function to display the pie chart with bright colors and actual numbers
-def plot_publication_years_pie_chart(year_count):
-    if year_count:
-        years = list(year_count.keys())
-        counts = list(year_count.values())
-
-        plt.figure(figsize=(8, 8))
-
-        # Using a bright and dynamic color palette
-        bright_colors = ['#ff9999','#66b3ff','#99ff99','#ffcc99','#ff6666','#ffcc66','#cc99ff','#66ff66','#6699ff','#ff9966']
-        
-        # Making sure we have enough colors for all years
-        if len(bright_colors) < len(years):
-            bright_colors = plt.cm.get_cmap('hsv', len(years))(range(len(years)))
-
-        # Plotting the pie chart with actual numbers displayed on each slice
-        plt.pie(counts, labels=[f'{year} ({count})' for year, count in zip(years, counts)], colors=bright_colors, startangle=140, wedgeprops={'edgecolor': 'black'})
-        
-        plt.title('Distribution of Articles by Publication Year', fontsize=16)
-        plt.axis('equal')  # Equal aspect ratio ensures the pie is drawn as a circle.
-        st.pyplot(plt)
-
 # Streamlit UI for user inputs
-st.title("PubMed Research Navigator")
-st.write("Search PubMed for articles and save the results as an Excel file.")
-
+st.title("PubMed Research Navigator with SciSpacy")
 email = st.text_input("Enter your email (for PubMed access):")
 search_term = st.text_input("Enter the general search term:")
-mesh_term = st.text_input("Enter an optional MeSH term (leave blank if not needed):")
-article_choice = st.selectbox("Select article type:", list(article_types.keys()))
 num_articles = st.number_input("Enter the number of articles to fetch:", min_value=1, max_value=1000, value=10)
 
-if st.button("Fetch Articles"):
+if st.button("Fetch and Analyze Articles"):
     if email and search_term:
-        query = construct_query(search_term, mesh_term, article_choice)
-        articles = fetch_abstracts(query, num_articles, email)
+        query = f"({search_term})"
+        articles_df = fetch_and_process_articles(query, num_articles, email)
         
-        if articles:
-            excel_data = save_to_excel(articles)
+        if not articles_df.empty:
+            st.write("Extracted Data:")
+            st.write(articles_df)
+            
+            # Allow download of processed data
+            excel_data = save_to_excel(articles_df)
             st.download_button(
-                label="Download Excel file",
-                data=excel_data,
-                file_name="pubmed_articles.xlsx",
+                label="Download Extracted Data",
+                data=excel_data.getvalue(),
+                file_name="extracted_pubmed_data.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
-            
-            # Count articles by year and plot the pie chart with bright colors and actual numbers
-            year_count = count_articles_by_year(articles)
-            if year_count:
-                st.write("Publication Year Distribution (Pie Chart):")
-                plot_publication_years_pie_chart(year_count)
-            else:
-                st.write("No valid publication dates found to plot the graph.")
         else:
             st.write("No articles fetched.")
     else:
-        st.write("Please fill in all the required fields.")
+        st.write("Please enter valid input.")
 
+# Display copyright information at the bottom of the app
 st.write("""
     ### Copyright Information
     Copyright (c) 2024 Anurag Pande
