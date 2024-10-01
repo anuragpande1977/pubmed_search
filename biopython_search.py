@@ -78,17 +78,18 @@ def count_articles_by_year(articles):
     
     return year_count
 
-# Function to display the bar chart
-def plot_publication_years(year_count):
+# Function to display the bubble chart
+def plot_publication_years_bubble(year_count):
     if year_count:
         years = list(year_count.keys())
         counts = list(year_count.values())
+        sizes = [count * 100 for count in counts]  # Bubble sizes (scale factor for better visualization)
 
         plt.figure(figsize=(10, 5))
-        plt.bar(years, counts, color='blue')
+        plt.scatter(years, counts, s=sizes, alpha=0.5, c=counts, cmap="cool", edgecolors="w", linewidth=2)
         plt.xlabel('Publication Year')
         plt.ylabel('Number of Articles')
-        plt.title('Number of Articles Published per Year')
+        plt.title('Number of Articles Published per Year (Bubble Size Represents Quantity)')
         plt.xticks(rotation=45)
         st.pyplot(plt)
 
@@ -115,33 +116,30 @@ if st.button("Fetch Articles"):
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
             
-            # Count articles by year and plot the results
+            # Count articles by year and plot the results with a bubble chart
             year_count = count_articles_by_year(articles)
             if year_count:
-                st.write("Publication Year Distribution:")
-                plot_publication_years(year_count)
+                st.write("Publication Year Distribution (Bubble Chart):")
+                plot_publication_years_bubble(year_count)
             else:
                 st.write("No valid publication dates found to plot the graph.")
         else:
             st.write("No articles fetched.")
     else:
         st.write("Please fill in all the required fields.")
-st.write("Copyright (c) 2024 Anurag Pande")
-# Copyright information
 
-# Copyright information
-# 
-# Copyright (c) 2024 Anurag Pande
-#
-# Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), 
-# to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-# and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
-# IN THE SOFTWARE.
-
-
+st.write("""
+    ### Copyright Information
+    Copyright (c) 2024 Anurag Pande
+    
+    Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), 
+    to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+    and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+    
+    The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+    
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+    IN THE SOFTWARE.
+""")
