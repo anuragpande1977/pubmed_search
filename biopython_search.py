@@ -78,18 +78,24 @@ def count_articles_by_year(articles):
     
     return year_count
 
-# Function to display the pie chart with bright colors
+# Function to display the pie chart with bright colors and actual numbers
 def plot_publication_years_pie_chart(year_count):
     if year_count:
         years = list(year_count.keys())
         counts = list(year_count.values())
 
         plt.figure(figsize=(8, 8))
-        
-        # Using a bright color map for the pie chart
-        bright_colors = plt.cm.get_cmap('Set3', len(years))
 
-        plt.pie(counts, labels=years, autopct='%1.1f%%', colors=bright_colors(range(len(years))), startangle=140, wedgeprops={'edgecolor': 'black'})
+        # Using a bright and dynamic color palette
+        bright_colors = ['#ff9999','#66b3ff','#99ff99','#ffcc99','#ff6666','#ffcc66','#cc99ff','#66ff66','#6699ff','#ff9966']
+        
+        # Making sure we have enough colors for all years
+        if len(bright_colors) < len(years):
+            bright_colors = plt.cm.get_cmap('hsv', len(years))(range(len(years)))
+
+        # Plotting the pie chart with actual numbers displayed on each slice
+        plt.pie(counts, labels=[f'{year} ({count})' for year, count in zip(years, counts)], colors=bright_colors, startangle=140, wedgeprops={'edgecolor': 'black'})
+        
         plt.title('Distribution of Articles by Publication Year', fontsize=16)
         plt.axis('equal')  # Equal aspect ratio ensures the pie is drawn as a circle.
         st.pyplot(plt)
@@ -117,7 +123,7 @@ if st.button("Fetch Articles"):
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
             
-            # Count articles by year and plot the pie chart with bright colors
+            # Count articles by year and plot the pie chart with bright colors and actual numbers
             year_count = count_articles_by_year(articles)
             if year_count:
                 st.write("Publication Year Distribution (Pie Chart):")
