@@ -4,8 +4,6 @@ import streamlit as st
 from Bio import Entrez, Medline
 from io import BytesIO
 import matplotlib.pyplot as plt
-from pyvis.network import Network
-import ast
 
 # Define PubMed article types and their corresponding search tags
 article_types = {
@@ -52,59 +50,6 @@ def fetch_abstracts(query, num_articles, email):
         st.write(f"An error occurred: {e}")
         return []
 
-# Function to extract MeSH terms and Chemicals from articles
-def extract_entities(articles):
-    extracted_data = []
-    for article in articles:
-        title = article.get('TI', 'No title available')
-        mesh_terms = article.get('MH', [])
-        abstract = article.get('AB', 'No abstract available')
-
-        chemicals = []  # You might extract chemicals from 'RN' or 'OT' fields or using custom extraction logic
-        # Simplified chemical extraction logic - you might want to use NLP or regex in a real application
-        chemicals += [word for word in abstract.split() if 'chem' in word.lower()]  # Example chemical detection
-
-        extracted_data.append({
-            'Title': title,
-            'MeSH Terms': mesh_terms,
-            'Chemicals': chemicals
-        })
-    
-    return pd.DataFrame(extracted_data)
-
-# Function to create interactive graph between MeSH terms and Chemicals
-def create_interactive_graph(df, title_column, mesh_column, chemical_column, central_word, background_color, output_file_path):
-    color_options = {
-        "mesh": "#FF5733",  # Example color for MeSH terms
-        "chemical": "#33CFFF",  # Example color for chemicals
-    }
-    default_node_size = 15  # Uniform node size for all nodes
-    central_color = "#FFFF00"  # Highlight color for the central entity
-
-    net = Network(notebook=False, height="100%", width="100%", bgcolor=background_color, font_color="white")
-    net.barnes_hut()
-
-    # Explicitly add the central entity
-    net.add_node(central_word, label=central_word, color=central_color, size=default_node_size, title="Central Entity")
-
-    for _, row in df.iterrows():
-        mesh_terms = row[mesh_column]
-        chemicals = row[chemical_column]
-        title = row[title_column]
-
-        for term in mesh_terms:
-            if not net.get_node(term):
-                net.add_node(term, label=term, color=color_options["mesh"], size=default_node_size, title=title)
-            net.add_edge(central_word, term)
-
-        for chemical in chemicals:
-            if not net.get_node(chemical):
-                net.add_node(chemical, label=chemical, color=color_options["chemical"], size=default_node_size, title=title)
-            net.add_edge(central_word, chemical)
-
-    net.write_html(output_file_path)
-    return output_file_path
-
 # Function to generate Excel file in memory
 def save_to_excel(articles):
     output = BytesIO()
@@ -125,24 +70,57 @@ def save_to_excel(articles):
     output.seek(0)  # Move the buffer position to the beginning
     return output
 
+# Function to count articles by publication year
+def count_articles_by_year(articles):
+    year_count = {}
+    
+    for article in articles:
+        pub_date = article.get('DP', 'No publication date available')
+        if pub_date != 'No publication date available':
+            year = pub_date.split()[0]  # Extracting the year
+            if year.isdigit():  # Ensure it's a valid year
+                year_count[year] = year_count.get(year, 0) + 1
+    
+    return year_count
+
+# Function to display the pie chart with bright colors and actual numbers
+def plot_publication_years_pie_chart(year_count):
+    if year_count:
+        years = list(year_count.keys())
+        counts = list(year_count.values())
+
+        plt.figure(figsize=(8, 8))
+
+        # Using a bright and dynamic color palette
+        bright_colors = ['#ff9999','#66b3ff','#99ff99','#ffcc99','#ff6666','#ffcc66','#cc99ff','#66ff66','#6699ff','#ff9966']
+        
+        # Making sure we have enough colors for all years
+        if len(bright_colors) < len(years):
+            bright_colors = plt.cm.get_cmap('hsv', len(years))(range(len(years)))
+
+        # Plotting the pie chart with actual numbers displayed on each slice
+        plt.pie(counts, labels=[f'{year} ({count})' for year, count in zip(years, counts)], colors=bright_colors, startangle=140, wedgeprops={'edgecolor': 'black'})
+        
+        plt.title('Distribution of Articles by Publication Year', fontsize=16)
+        plt.axis('equal')  # Equal aspect ratio ensures the pie is drawn as a circle.
+        st.pyplot(plt)
+
 # Streamlit UI for user inputs
-st.title("PubMed Research Navigator with MeSH-Chemical Relationship Graph")
-st.write("Search PubMed for articles, save results as an Excel file, or create a relationship graph between MeSH terms and chemicals.")
+st.title("PubMed Research Navigator")
+st.write("Search PubMed for articles and save the results as an Excel file.")
 
 email = st.text_input("Enter your email (for PubMed access):")
 search_term = st.text_input("Enter the general search term:")
 mesh_term = st.text_input("Enter an optional MeSH term (leave blank if not needed):")
 article_choice = st.selectbox("Select article type:", list(article_types.keys()))
 num_articles = st.number_input("Enter the number of articles to fetch:", min_value=1, max_value=1000, value=10)
-central_word = st.text_input("Enter the central word for the graph (e.g., disease or keyword):").lower()
 
-if st.button("Fetch Articles and Create Graph"):
-    if email and search_term and central_word:
+if st.button("Fetch Articles"):
+    if email and search_term:
         query = construct_query(search_term, mesh_term, article_choice)
         articles = fetch_abstracts(query, num_articles, email)
         
         if articles:
-            # Save articles as an Excel file
             excel_data = save_to_excel(articles)
             st.download_button(
                 label="Download Excel file",
@@ -150,15 +128,14 @@ if st.button("Fetch Articles and Create Graph"):
                 file_name="pubmed_articles.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
-
-            # Extract entities (MeSH terms and chemicals)
-            df_entities = extract_entities(articles)
-
-            # Create and visualize the interactive graph
-            background_color = 'black'
-            output_html = 'mesh_chemical_relationship_graph.html'
-            graph_path = create_interactive_graph(df_entities, 'Title', 'MeSH Terms', 'Chemicals', central_word, background_color, output_html)
-            st.write(f"Graph created! You can download or view it [here](./{output_html}).")
+            
+            # Count articles by year and plot the pie chart with bright colors and actual numbers
+            year_count = count_articles_by_year(articles)
+            if year_count:
+                st.write("Publication Year Distribution (Pie Chart):")
+                plot_publication_years_pie_chart(year_count)
+            else:
+                st.write("No valid publication dates found to plot the graph.")
         else:
             st.write("No articles fetched.")
     else:
