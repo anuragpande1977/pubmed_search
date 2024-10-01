@@ -1,3 +1,6 @@
+scispacy>=0.5.0
+spacy>=3.0
+en_core_sci_sm @ https://github.com/allenai/scispacy/releases/download/v0.5.0/en_core_sci_sm-0.5.0.tar.gz
 streamlit>=1.0
 pandas>=1.2
 biopython>=1.78
