@@ -1,6 +1,6 @@
-streamlit
-matplotlib
-pandas
-biopython
-openpyxl
-numpy
+streamlit>=1.0
+pandas>=1.2
+biopython>=1.78
+matplotlib>=3.3
+pyvis>=0.1.9.2
+openpyxl>=3.0.7
