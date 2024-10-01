@@ -1,46 +1,119 @@
+import os
 import pandas as pd
 import streamlit as st
+import matplotlib.pyplot as plt
+from io import BytesIO
 from transformers import AutoTokenizer, AutoModelForTokenClassification, pipeline
+from Bio import Entrez, Medline
+from collections import Counter
 
 # Load BioBERT Tokenizer and Model for NER
 tokenizer = AutoTokenizer.from_pretrained("dmis-lab/biobert-base-cased-v1.1")
 model = AutoModelForTokenClassification.from_pretrained("dmis-lab/biobert-base-cased-v1.1")
-
-# Initialize NER pipeline using BioBERT
 ner_pipeline = pipeline("ner", model=model, tokenizer=tokenizer)
+
+# Function to fetch PubMed articles based on a search term
+def fetch_pubmed_articles(query, num_articles, email):
+    Entrez.email = email
+    handle = Entrez.esearch(db="pubmed", term=query, retmax=num_articles)
+    record = Entrez.read(handle)
+    handle.close()
+
+    ids = record['IdList']
+    handle = Entrez.efetch(db="pubmed", id=ids, rettype="medline", retmode="text")
+    articles = list(Medline.parse(handle))
+    handle.close()
+
+    return articles
 
 # Function to perform NER on biomedical text using BioBERT
 def bio_ner(text):
     ner_results = ner_pipeline(text)
     return ner_results
 
+# Function to generate publication year distribution graph
+def plot_publication_years(articles):
+    years = [article.get('DP', 'No Year').split()[0] for article in articles]
+    year_counts = Counter(years)
+
+    plt.figure(figsize=(10, 6))
+    plt.bar(year_counts.keys(), year_counts.values(), color='skyblue')
+    plt.xlabel('Publication Year')
+    plt.ylabel('Number of Articles')
+    plt.title('Distribution of Articles by Publication Year')
+    st.pyplot(plt)
+
+# Function to save results to Excel
+def save_to_excel(data):
+    output = BytesIO()
+    df = pd.DataFrame(data)
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False)
+    output.seek(0)
+    return output
+
 # Streamlit UI for user inputs
-st.title("PubMed Research Navigator with BioBERT NER")
+st.title("PubMed Research Navigator with BioBERT NER and Data Visualization")
+
+# Input fields for PubMed search
 email = st.text_input("Enter your email (for PubMed access):")
-search_term = st.text_input("Enter the general search term:")
+search_term = st.text_input("Enter the PubMed search term:")
 num_articles = st.number_input("Enter the number of articles to fetch:", min_value=1, max_value=1000, value=10)
 
-# Sample biomedical text (this would come from fetched PubMed articles)
-sample_text = "SARS-CoV-2, the virus responsible for COVID-19, affects the respiratory system."
+# MeSH term (optional)
+mesh_term = st.text_input("Enter a MeSH term (optional):")
 
-if st.button("Analyze Text with BioBERT NER"):
+# Fetch and analyze PubMed articles
+if st.button("Fetch and Analyze PubMed Articles"):
     if email and search_term:
-        st.write("Performing NER with BioBERT...")
+        st.write(f"Fetching {num_articles} articles related to '{search_term}' from PubMed...")
+
+        # Construct PubMed query
+        query = f"{search_term} AND {mesh_term}" if mesh_term else search_term
         
-        # Call the BioBERT NER function on the sample text
-        ner_results = bio_ner(sample_text)
-        
-        # Display results
-        if ner_results:
-            st.write("Named Entities extracted from the text:")
+        # Fetch PubMed articles
+        articles = fetch_pubmed_articles(query, num_articles, email)
+        st.write(f"Fetched {len(articles)} articles.")
+
+        # Extract publication year and plot graph
+        st.write("Publication Year Distribution:")
+        plot_publication_years(articles)
+
+        # Process each article for NER and display results
+        all_ner_results = []
+        pubmed_data = []
+        for article in articles:
+            title = article.get('TI', 'No title available')
+            abstract = article.get('AB', 'No abstract available')
+            
+            # Combine title and abstract for NER
+            text = f"{title} {abstract}"
+            ner_results = bio_ner(text)
+
+            # Store NER results with article metadata
+            article_data = {
+                'Title': title,
+                'Abstract': abstract,
+                'Publication Year': article.get('DP', 'No publication date available').split()[0],
+                'Journal': article.get('TA', 'No journal available'),
+                'NER Results': ", ".join([f"{ent['word']} ({ent['entity']})" for ent in ner_results])
+            }
+            pubmed_data.append(article_data)
+
+            # Display NER results
+            st.write(f"Title: {title}")
             for entity in ner_results:
                 st.write(f"Entity: {entity['word']}, Label: {entity['entity']}, Score: {entity['score']}")
-        else:
-            st.write("No entities found.")
-    else:
-        st.write("Please enter valid input.")
 
-# Display copyright information
+        # Offer results as a downloadable Excel file
+        if st.button("Download Results as Excel"):
+            excel_data = save_to_excel(pubmed_data)
+            st.download_button(label="Download Excel", data=excel_data, file_name="pubmed_ner_results.xlsx")
+
+    else:
+        st.write("Please enter both your email and a search term.")
+
+# Copyright information
 st.write("""
     ### Copyright Information
     Copyright (c) 2024 Anurag Pande
