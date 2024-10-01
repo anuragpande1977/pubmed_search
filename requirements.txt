@@ -4,3 +4,4 @@ pandas
 biopython
 openpyxl
 numpy
+plotly
