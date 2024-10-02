@@ -12,6 +12,51 @@ tokenizer = AutoTokenizer.from_pretrained("dmis-lab/biobert-base-cased-v1.1")
 model = AutoModelForTokenClassification.from_pretrained("dmis-lab/biobert-base-cased-v1.1")
 ner_pipeline = pipeline("ner", model=model, tokenizer=tokenizer)
 
+# Function to perform NER on biomedical text using BioBERT
+def bio_ner(text):
+    # Ensure the text is not empty
+    if not text.strip():  # Check for empty or whitespace-only text
+        return []
+
+    # Truncate the text to 512 tokens to avoid tensor size mismatch error
+    tokenized_text = tokenizer(text, truncation=True, max_length=512, return_tensors="pt")
+
+    # Perform NER using the BioBERT pipeline
+    ner_results = ner_pipeline(text)
+
+    return ner_results
+
+# Function to rejoin sub-tokens
+def rejoin_subtokens(ner_results):
+    combined_results = []
+    current_word = ""
+    current_label = None
+
+    for entity in ner_results:
+        word = entity['word'].replace("##", "")  # Rejoin sub-tokens
+        label = entity['entity']
+
+        if current_label == label:
+            current_word += word
+        else:
+            if current_word:
+                combined_results.append((current_word, current_label))
+            current_word = word
+            current_label = label
+
+    if current_word:
+        combined_results.append((current_word, current_label))
+
+    return combined_results
+
+# Function to map LABEL_0 and LABEL_1 to more meaningful labels
+def map_labels(label):
+    if label == "LABEL_0":
+        return "Non-Entity"
+    elif label == "LABEL_1":
+        return "Entity"
+    return label
+
 # Function to fetch PubMed articles based on a search term
 def fetch_pubmed_articles(query, num_articles, email):
     Entrez.email = email
@@ -25,11 +70,6 @@ def fetch_pubmed_articles(query, num_articles, email):
     handle.close()
 
     return articles
-
-# Function to perform NER on biomedical text using BioBERT
-def bio_ner(text):
-    ner_results = ner_pipeline(text)
-    return ner_results
 
 # Function to generate publication year distribution graph
 def plot_publication_years(articles):
@@ -84,11 +124,16 @@ if st.button("Fetch and Analyze PubMed Articles"):
         pubmed_data = []
         for article in articles:
             title = article.get('TI', 'No title available')
-            abstract = article.get('AB', 'No abstract available')
-            
+            abstract = article.get('AB', '')
+
+            # Skip processing if both title and abstract are empty
+            if not title.strip() and not abstract.strip():
+                continue
+
             # Combine title and abstract for NER
-            text = f"{title} {abstract}"
+            text = f"{title} {abstract}".strip()  # Ensure input text is not empty
             ner_results = bio_ner(text)
+            rejoined_results = rejoin_subtokens(ner_results)
 
             # Store NER results with article metadata
             article_data = {
@@ -96,19 +141,18 @@ if st.button("Fetch and Analyze PubMed Articles"):
                 'Abstract': abstract,
                 'Publication Year': article.get('DP', 'No publication date available').split()[0],
                 'Journal': article.get('TA', 'No journal available'),
-                'NER Results': ", ".join([f"{ent['word']} ({ent['entity']})" for ent in ner_results])
+                'NER Results': ", ".join([f"{word} ({map_labels(label)})" for word, label in rejoined_results])
             }
             pubmed_data.append(article_data)
 
             # Display NER results
             st.write(f"Title: {title}")
-            for entity in ner_results:
-                st.write(f"Entity: {entity['word']}, Label: {entity['entity']}, Score: {entity['score']}")
+            for word, label in rejoined_results:
+                st.write(f"Entity: {word}, Label: {map_labels(label)}")
 
         # Offer results as a downloadable Excel file
-        if st.button("Download Results as Excel"):
-            excel_data = save_to_excel(pubmed_data)
-            st.download_button(label="Download Excel", data=excel_data, file_name="pubmed_ner_results.xlsx")
+        excel_data = save_to_excel(pubmed_data)
+        st.download_button(label="Download Excel", data=excel_data, file_name="pubmed_ner_results.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
     else:
         st.write("Please enter both your email and a search term.")
