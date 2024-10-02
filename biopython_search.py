@@ -46,7 +46,7 @@ def save_to_excel(data):
     return output
 
 # Streamlit UI for user inputs
-st.title("PubMed Research Navigator with Data Visualization")
+st.title("PubMed Research Navigator")
 
 # Input fields for PubMed search
 email = st.text_input("Enter your email (for PubMed access):")
@@ -81,7 +81,7 @@ if st.button("Fetch and Analyze PubMed Articles"):
 
         # Offer results as a downloadable Excel file
         excel_data = save_to_excel(pubmed_data)
-        st.download_button(label="Download Excel", data=excel_data, file_name="pubmed_articles.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        st.download_button(label="Download Results", data=excel_data, file_name="pubmed_articles.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
         # Extract publication year and plot pie chart
         st.write("Publication Year Distribution:")
