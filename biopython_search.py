@@ -20,13 +20,19 @@ def fetch_pubmed_articles(query, num_articles, email):
 
     return articles
 
-# Function to generate a pie chart for publication year distribution
+# Function to generate a pie chart for publication year distribution with number of articles
 def plot_publication_years_pie(articles):
     years = [article.get('DP', 'No Year').split()[0] for article in articles]
     year_counts = Counter(years)
 
     plt.figure(figsize=(7, 7))
-    plt.pie(year_counts.values(), labels=year_counts.keys(), autopct='%1.1f%%', startangle=140, colors=plt.cm.Paired.colors)
+    colors = plt.cm.Set3.colors  # Use a bright color palette
+    plt.pie(
+        year_counts.values(), 
+        labels=[f"{year} ({count})" for year, count in year_counts.items()],  # Show the number of articles
+        startangle=140, 
+        colors=colors
+    )
     plt.title('Distribution of Articles by Publication Year')
     st.pyplot(plt)
 
@@ -40,7 +46,7 @@ def save_to_excel(data):
     return output
 
 # Streamlit UI for user inputs
-st.title("PubMed Research Navigator")
+st.title("PubMed Research Navigator with Data Visualization")
 
 # Input fields for PubMed search
 email = st.text_input("Enter your email (for PubMed access):")
@@ -62,10 +68,6 @@ if st.button("Fetch and Analyze PubMed Articles"):
         articles = fetch_pubmed_articles(query, num_articles, email)
         st.write(f"Fetched {len(articles)} articles.")
 
-        # Extract publication year and plot pie chart
-        st.write("Publication Year Distribution:")
-        plot_publication_years_pie(articles)
-
         # Prepare PubMed data for download
         pubmed_data = []
         for article in articles:
@@ -79,7 +81,11 @@ if st.button("Fetch and Analyze PubMed Articles"):
 
         # Offer results as a downloadable Excel file
         excel_data = save_to_excel(pubmed_data)
-        st.download_button(label="Download Results", data=excel_data, file_name="pubmed_articles.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        st.download_button(label="Download Excel", data=excel_data, file_name="pubmed_articles.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+        # Extract publication year and plot pie chart
+        st.write("Publication Year Distribution:")
+        plot_publication_years_pie(articles)
 
     else:
         st.write("Please enter both your email and a search term.")
