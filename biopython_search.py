@@ -21,8 +21,8 @@ def bio_ner(text):
     # Truncate the text to 512 tokens to avoid tensor size mismatch error
     tokenized_text = tokenizer(text, truncation=True, max_length=512, return_tensors="pt")
 
-    # Perform NER using the BioBERT pipeline (truncate text)
-    ner_results = ner_pipeline(tokenizer.decode(tokenized_text['input_ids'][0]), truncation=True)
+    # Perform NER using the BioBERT pipeline (no truncation argument needed)
+    ner_results = ner_pipeline(tokenizer.decode(tokenized_text['input_ids'][0]))
 
     return ner_results
 
