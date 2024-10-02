@@ -4,11 +4,11 @@ biopython>=1.78
 matplotlib>=3.3
 pyvis>=0.1.9.2
 openpyxl>=3.0.7
-scispacy==0.5.3  # Latest compatible version of scispacy
-spacy>=3.6.0,<3.7.0  # Version required by scispacy 0.5.3
+scispacy
+spacy
 transformers>=4.11.0  # For BioBERT
 torch>=1.9.0  # Required for BioBERT
-scipy>=1.9.0  # Using pre-built binaries
-numpy>=1.21.0  # Using pre-built binaries
+scipy
+numpy
 
 
