@@ -3,59 +3,8 @@ import pandas as pd
 import streamlit as st
 import matplotlib.pyplot as plt
 from io import BytesIO
-from transformers import AutoTokenizer, AutoModelForTokenClassification, pipeline
 from Bio import Entrez, Medline
 from collections import Counter
-
-# Load BioBERT Tokenizer and Model for NER
-tokenizer = AutoTokenizer.from_pretrained("dmis-lab/biobert-base-cased-v1.1")
-model = AutoModelForTokenClassification.from_pretrained("dmis-lab/biobert-base-cased-v1.1")
-ner_pipeline = pipeline("ner", model=model, tokenizer=tokenizer)
-
-# Function to perform NER on biomedical text using BioBERT
-def bio_ner(text):
-    # Ensure the text is not empty
-    if not text.strip():  # Check for empty or whitespace-only text
-        return []
-
-    # Truncate the text to 512 tokens to avoid tensor size mismatch error
-    tokenized_text = tokenizer(text, truncation=True, max_length=512, return_tensors="pt")
-
-    # Perform NER using the BioBERT pipeline (no truncation argument needed)
-    ner_results = ner_pipeline(tokenizer.decode(tokenized_text['input_ids'][0]))
-
-    return ner_results
-
-# Function to rejoin sub-tokens
-def rejoin_subtokens(ner_results):
-    combined_results = []
-    current_word = ""
-    current_label = None
-
-    for entity in ner_results:
-        word = entity['word'].replace("##", "")  # Rejoin sub-tokens
-        label = entity['entity']
-
-        if current_label == label:
-            current_word += word
-        else:
-            if current_word:
-                combined_results.append((current_word, current_label))
-            current_word = word
-            current_label = label
-
-    if current_word:
-        combined_results.append((current_word, current_label))
-
-    return combined_results
-
-# Function to map LABEL_0 and LABEL_1 to more meaningful labels
-def map_labels(label):
-    if label == "LABEL_0":
-        return "Non-Entity"
-    elif label == "LABEL_1":
-        return "Entity"
-    return label
 
 # Function to fetch PubMed articles based on a search term
 def fetch_pubmed_articles(query, num_articles, email):
@@ -71,15 +20,13 @@ def fetch_pubmed_articles(query, num_articles, email):
 
     return articles
 
-# Function to generate publication year distribution graph
-def plot_publication_years(articles):
+# Function to generate a pie chart for publication year distribution
+def plot_publication_years_pie(articles):
     years = [article.get('DP', 'No Year').split()[0] for article in articles]
     year_counts = Counter(years)
 
-    plt.figure(figsize=(10, 6))
-    plt.bar(year_counts.keys(), year_counts.values(), color='skyblue')
-    plt.xlabel('Publication Year')
-    plt.ylabel('Number of Articles')
+    plt.figure(figsize=(7, 7))
+    plt.pie(year_counts.values(), labels=year_counts.keys(), autopct='%1.1f%%', startangle=140, colors=plt.cm.Paired.colors)
     plt.title('Distribution of Articles by Publication Year')
     st.pyplot(plt)
 
@@ -93,7 +40,7 @@ def save_to_excel(data):
     return output
 
 # Streamlit UI for user inputs
-st.title("PubMed Research Navigator with BioBERT NER and Data Visualization")
+st.title("PubMed Research Navigator with Data Visualization")
 
 # Input fields for PubMed search
 email = st.text_input("Enter your email (for PubMed access):")
@@ -115,44 +62,24 @@ if st.button("Fetch and Analyze PubMed Articles"):
         articles = fetch_pubmed_articles(query, num_articles, email)
         st.write(f"Fetched {len(articles)} articles.")
 
-        # Extract publication year and plot graph
+        # Extract publication year and plot pie chart
         st.write("Publication Year Distribution:")
-        plot_publication_years(articles)
+        plot_publication_years_pie(articles)
 
-        # Process each article for NER and display results
-        all_ner_results = []
+        # Prepare PubMed data for download
         pubmed_data = []
         for article in articles:
-            title = article.get('TI', 'No title available')
-            abstract = article.get('AB', '')
-
-            # Skip processing if both title and abstract are empty
-            if not title.strip() and not abstract.strip():
-                continue
-
-            # Combine title and abstract for NER
-            text = f"{title} {abstract}".strip()  # Ensure input text is not empty
-            ner_results = bio_ner(text)
-            rejoined_results = rejoin_subtokens(ner_results)
-
-            # Store NER results with article metadata
             article_data = {
-                'Title': title,
-                'Abstract': abstract,
+                'Title': article.get('TI', 'No title available'),
+                'Abstract': article.get('AB', 'No abstract available'),
                 'Publication Year': article.get('DP', 'No publication date available').split()[0],
-                'Journal': article.get('TA', 'No journal available'),
-                'NER Results': ", ".join([f"{word} ({map_labels(label)})" for word, label in rejoined_results])
+                'Journal': article.get('TA', 'No journal available')
             }
             pubmed_data.append(article_data)
 
-            # Display NER results
-            st.write(f"Title: {title}")
-            for word, label in rejoined_results:
-                st.write(f"Entity: {word}, Label: {map_labels(label)}")
-
         # Offer results as a downloadable Excel file
         excel_data = save_to_excel(pubmed_data)
-        st.download_button(label="Download Excel", data=excel_data, file_name="pubmed_ner_results.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        st.download_button(label="Download Excel", data=excel_data, file_name="pubmed_articles.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
     else:
         st.write("Please enter both your email and a search term.")
