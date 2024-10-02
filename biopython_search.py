@@ -134,7 +134,7 @@ if st.button("Fetch Articles"):
         if articles:
             excel_data = save_to_excel(articles)
             st.download_button(
-                label="Download Excel file",
+                label="Download Abstracts",
                 data=excel_data,
                 file_name="pubmed_articles.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
